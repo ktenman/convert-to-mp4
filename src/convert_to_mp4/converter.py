@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import shutil
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -168,7 +168,7 @@ def convert_directory(directory: Path, options: ConversionOptions) -> list[Conve
 
     results = []
     if options.jobs > 1:
-        with ProcessPoolExecutor(max_workers=options.jobs) as executor:
+        with ThreadPoolExecutor(max_workers=options.jobs) as executor:
             futures = {
                 executor.submit(convert_file, f, options): f for f in files
             }

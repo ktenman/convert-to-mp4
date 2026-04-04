@@ -156,6 +156,53 @@ class TestFindVideoFiles:
         assert len(files) == 1
 
 
+class TestConvertDirectory:
+    def test_returns_empty_for_no_video_files(self, tmp_path, mocker):
+        (tmp_path / "readme.txt").touch()
+        mocker.patch("convert_to_mp4.converter.console")
+
+        results = convert_directory(tmp_path, ConversionOptions())
+        assert results == []
+
+    def test_converts_all_video_files(self, tmp_path, mocker):
+        (tmp_path / "a.mkv").write_bytes(b"\x00" * 1024)
+        (tmp_path / "b.avi").write_bytes(b"\x00" * 1024)
+
+        mock_convert = mocker.patch(
+            "convert_to_mp4.converter.convert_file",
+            return_value=ConversionResult(
+                input_path=tmp_path / "a.mkv",
+                output_path=tmp_path / "a.mp4",
+                success=True,
+            ),
+        )
+        mocker.patch("convert_to_mp4.converter.console")
+
+        results = convert_directory(tmp_path, ConversionOptions())
+
+        assert len(results) == 2
+        assert mock_convert.call_count == 2
+
+    def test_parallel_converts_all_files(self, tmp_path, mocker):
+        (tmp_path / "a.mkv").write_bytes(b"\x00" * 1024)
+        (tmp_path / "b.mkv").write_bytes(b"\x00" * 1024)
+
+        mocker.patch(
+            "convert_to_mp4.converter.convert_file",
+            return_value=ConversionResult(
+                input_path=tmp_path / "a.mkv",
+                output_path=tmp_path / "a.mp4",
+                success=True,
+            ),
+        )
+        mocker.patch("convert_to_mp4.converter.console")
+
+        options = ConversionOptions(jobs=2)
+        results = convert_directory(tmp_path, options)
+
+        assert len(results) == 2
+
+
 class TestCheckDiskSpace:
     def test_returns_true_with_enough_space(self, mocker):
         mocker.patch("shutil.disk_usage", return_value=MagicMock(free=10_000_000))

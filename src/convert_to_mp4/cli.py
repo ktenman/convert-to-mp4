@@ -24,7 +24,7 @@ app = typer.Typer(
 console = Console()
 
 
-def generate_report(results: list[ConversionResult]) -> None:
+def generate_report(results: list[ConversionResult], *, dry_run: bool = False) -> None:
     if not results:
         return
 
@@ -66,16 +66,21 @@ def generate_report(results: list[ConversionResult]) -> None:
         if total_saved > 0:
             console.print(f"Total space saved: [green]{total_saved // 1024}K[/green]")
 
+    if dry_run:
+        return
+
     now = datetime.now()
     report_name = f"conversion_report_{now.strftime('%Y%m%d_%H%M%S')}.txt"
-    with open(report_name, "w") as f:
-        f.write(f"Conversion Report - {now}\n")
-        f.write(f"Total: {len(results)}, Success: {success_count}\n\n")
-        for r in results:
-            status = "OK" if r.success else ("SKIP" if r.skipped else "FAIL")
-            f.write(f"  [{status}] {r.input_path}\n")
-
-    console.print(f"Report saved to: [blue]{report_name}[/blue]")
+    try:
+        with open(report_name, "w") as f:
+            f.write(f"Conversion Report - {now}\n")
+            f.write(f"Total: {len(results)}, Success: {success_count}\n\n")
+            for r in results:
+                status = "OK" if r.success else ("SKIP" if r.skipped else "FAIL")
+                f.write(f"  [{status}] {r.input_path}\n")
+        console.print(f"Report saved to: [blue]{report_name}[/blue]")
+    except OSError:
+        console.print("[yellow]Could not save report file[/yellow]")
 
 
 def _validate_quality_range(min_q: int, max_q: int) -> None:
@@ -145,10 +150,10 @@ def _main(
 
     if path.is_file():
         result = convert_file(path, options)
-        generate_report([result])
+        generate_report([result], dry_run=dry_run)
     else:
         results = convert_directory(path, options)
-        generate_report(results)
+        generate_report(results, dry_run=dry_run)
 
 
 def main() -> None:
