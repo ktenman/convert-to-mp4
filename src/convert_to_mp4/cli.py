@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import json
+import logging
+import subprocess
+import urllib.request
 from datetime import datetime
+from importlib.metadata import version
 from pathlib import Path
 from typing import Annotated
 
@@ -16,12 +21,16 @@ from convert_to_mp4.converter import (
 )
 from convert_to_mp4.presets import Preset, get_preset_config
 
+logger = logging.getLogger(__name__)
+
 app = typer.Typer(
     name="convert-to-mp4",
     help="Smart video converter with automatic audio quality detection.",
     add_completion=False,
 )
 console = Console()
+
+GITHUB_REPO = "ktenman/convert-to-mp4"
 
 
 def generate_report(results: list[ConversionResult], *, dry_run: bool = False) -> None:
@@ -83,6 +92,44 @@ def generate_report(results: list[ConversionResult], *, dry_run: bool = False) -
         console.print("[yellow]Could not save report file[/yellow]")
 
 
+def _check_and_upgrade() -> None:
+    """Check GitHub for latest release and auto-upgrade if outdated."""
+    current = version("convert-to-mp4")
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+            headers={"Accept": "application/vnd.github+json"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            latest = json.loads(resp.read())["tag_name"].lstrip("v")
+    except Exception:
+        logger.debug("Failed to check for updates", exc_info=True)
+        return
+
+    if current == latest:
+        logger.info("convert-to-mp4 is up to date (v%s)", current)
+        return
+
+    logger.info("New version available: v%s (current: v%s)", latest, current)
+    console.print(f"[yellow]Upgrading v{current} -> v{latest}...[/yellow]")
+    upgrade_commands = [
+        ["uv", "tool", "upgrade", "convert-to-mp4"],
+        ["uv", "pip", "install", "--upgrade", f"git+https://github.com/{GITHUB_REPO}.git"],
+    ]
+    for cmd in upgrade_commands:
+        try:
+            subprocess.run(cmd, check=True, capture_output=True)
+            console.print(f"[green]Upgraded to v{latest}[/green]")
+            return
+        except Exception:
+            logger.debug("Upgrade with %s failed", cmd[1], exc_info=True)
+
+    logger.warning("All upgrade methods failed")
+    console.print(
+        "[yellow]Auto-upgrade failed. Run manually:[/yellow]\n  uv tool upgrade convert-to-mp4"
+    )
+
+
 def _validate_quality_range(min_q: int, max_q: int) -> None:
     if min_q > max_q:
         raise typer.BadParameter(
@@ -138,6 +185,9 @@ def _main(
     ] = False,
 ) -> None:
     """Convert video files to browser-compatible MP4 with smart audio quality detection."""
+    console.print(f"[dim]convert-to-mp4 v{version('convert-to-mp4')}[/dim]")
+    _check_and_upgrade()
+
     if file is not None:
         path = file
     elif directory is not None:

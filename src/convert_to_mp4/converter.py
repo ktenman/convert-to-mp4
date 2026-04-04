@@ -23,14 +23,34 @@ from convert_to_mp4.audio import AudioInfo, calculate_optimal_bitrate, should_re
 from convert_to_mp4.ffmpeg import ProbeResult, probe, run_conversion
 
 VIDEO_EXTENSIONS = {
-    ".mkv", ".avi", ".mov", ".mp4", ".webm",
-    ".flv", ".wmv", ".mpg", ".mpeg", ".m4v", ".3gp",
+    ".mkv",
+    ".avi",
+    ".mov",
+    ".mp4",
+    ".webm",
+    ".flv",
+    ".wmv",
+    ".mpg",
+    ".mpeg",
+    ".m4v",
+    ".3gp",
 }
 
 FALLBACK_PARAMS = [
-    "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-    "-c:a", "aac", "-ac", "2", "-b:a", "192k",
-    "-movflags", "+faststart",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-c:a",
+    "aac",
+    "-ac",
+    "2",
+    "-b:a",
+    "192k",
+    "-movflags",
+    "+faststart",
 ]
 
 console = Console()
@@ -69,10 +89,7 @@ def check_disk_space(directory: Path, file_size: int) -> bool:
 
 def find_video_files(directory: Path, recursive: bool) -> list[Path]:
     glob_fn = directory.rglob if recursive else directory.glob
-    files = [
-        f for f in glob_fn("*")
-        if f.is_file() and f.suffix.lower() in VIDEO_EXTENSIONS
-    ]
+    files = [f for f in glob_fn("*") if f.is_file() and f.suffix.lower() in VIDEO_EXTENSIONS]
     return sorted(files)
 
 
@@ -181,7 +198,11 @@ def convert_file(
     start = time.monotonic()
 
     success = _run_with_retries(
-        file_path, temp_output, params, probe_result.duration, on_progress,
+        file_path,
+        temp_output,
+        params,
+        probe_result.duration,
+        on_progress,
     )
 
     if success:
@@ -257,9 +278,7 @@ def convert_directory(directory: Path, options: ConversionOptions) -> list[Conve
             overall = progress.add_task("Overall", total=len(files))
 
             with ThreadPoolExecutor(max_workers=options.jobs) as executor:
-                futures = {
-                    executor.submit(convert_file, f, options): f for f in files
-                }
+                futures = {executor.submit(convert_file, f, options): f for f in files}
                 for future in as_completed(futures):
                     results.append(future.result())
                     progress.advance(overall)

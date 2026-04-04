@@ -19,6 +19,7 @@ convert-to-mp4 = "convert_to_mp4.cli:main"
 
 [dependency-groups]
 dev = [
+    "ruff>=0.8",
     "pytest>=8",
     "pytest-mock>=3",
 ]
@@ -29,3 +30,22 @@ packages = ["src/convert_to_mp4"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["integration: tests requiring real ffmpeg"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "RUF",   # ruff-specific rules
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["convert_to_mp4"]

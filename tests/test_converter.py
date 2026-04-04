@@ -42,7 +42,9 @@ def incompatible_probe():
 
 
 class TestConvertFile:
-    def test_skips_already_compatible_mp4(self, tmp_path, mocker, compatible_probe, default_options):
+    def test_skips_already_compatible_mp4(
+        self, tmp_path, mocker, compatible_probe, default_options
+    ):
         video = tmp_path / "test.mp4"
         video.write_bytes(b"\x00" * 1024)
 
@@ -54,7 +56,9 @@ class TestConvertFile:
         assert result.skipped is True
         mock_run.assert_not_called()
 
-    def test_converts_incompatible_audio(self, tmp_path, mocker, incompatible_probe, default_options):
+    def test_converts_incompatible_audio(
+        self, tmp_path, mocker, incompatible_probe, default_options
+    ):
         video = tmp_path / "test.mkv"
         video.write_bytes(b"\x00" * 1024)
 
@@ -86,7 +90,9 @@ class TestConvertFile:
         assert result.skip_reason == "dry run"
         mock_run.assert_not_called()
 
-    def test_error_recovery_retries_on_failure(self, tmp_path, mocker, incompatible_probe, default_options):
+    def test_error_recovery_retries_on_failure(
+        self, tmp_path, mocker, incompatible_probe, default_options
+    ):
         video = tmp_path / "test.mkv"
         video.write_bytes(b"\x00" * 1024)
 
@@ -104,7 +110,9 @@ class TestConvertFile:
         assert result.success is True
         assert mock_run.call_count == 3
 
-    def test_all_attempts_fail_returns_failure(self, tmp_path, mocker, incompatible_probe, default_options):
+    def test_all_attempts_fail_returns_failure(
+        self, tmp_path, mocker, incompatible_probe, default_options
+    ):
         video = tmp_path / "test.mkv"
         video.write_bytes(b"\x00" * 1024)
 
@@ -119,7 +127,9 @@ class TestConvertFile:
         assert result.success is False
         assert mock_run.call_count == 3
 
-    def test_mp4_with_incompatible_audio_uses_temp_file(self, tmp_path, mocker, incompatible_probe, default_options):
+    def test_mp4_with_incompatible_audio_uses_temp_file(
+        self, tmp_path, mocker, incompatible_probe, default_options
+    ):
         video = tmp_path / "test.mp4"
         video.write_bytes(b"\x00" * 1024)
 
@@ -136,7 +146,9 @@ class TestConvertFile:
         output_used = call_args.kwargs.get("output_path") or call_args[0][1]
         assert ".converting." in output_used.name
 
-    def test_mp4_failure_does_not_delete_original(self, tmp_path, mocker, incompatible_probe, default_options):
+    def test_mp4_failure_does_not_delete_original(
+        self, tmp_path, mocker, incompatible_probe, default_options
+    ):
         video = tmp_path / "test.mp4"
         video.write_bytes(b"\x00" * 1024)
 
@@ -155,6 +167,7 @@ class TestConvertDirectory:
     @pytest.fixture(autouse=True)
     def _quiet_console(self, mocker):
         from io import StringIO
+
         from rich.console import Console as RichConsole
 
         quiet = RichConsole(file=StringIO(), no_color=True)
