@@ -1,5 +1,3 @@
-"""Preset configurations for common conversion scenarios."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,8 +5,6 @@ from enum import Enum
 
 
 class Preset(str, Enum):
-    """Available conversion presets."""
-
     TV = "tv"
     MOBILE = "mobile"
     ARCHIVE = "archive"
@@ -17,8 +13,6 @@ class Preset(str, Enum):
 
 @dataclass(frozen=True)
 class PresetConfig:
-    """Configuration values for a preset."""
-
     min_quality: int
     max_quality: int
     description: str
@@ -33,5 +27,4 @@ _PRESET_CONFIGS: dict[Preset, PresetConfig] = {
 
 
 def get_preset_config(preset: Preset) -> PresetConfig:
-    """Get the configuration for a preset."""
     return _PRESET_CONFIGS[preset]

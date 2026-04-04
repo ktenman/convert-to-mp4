@@ -1,17 +1,22 @@
-"""Shared test fixtures for convert-to-mp4."""
-
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _clear_ffmpeg_cache():
+    yield
+    from convert_to_mp4.ffmpeg import get_ffmpeg_path, get_ffprobe_path
+
+    get_ffmpeg_path.cache_clear()
+    get_ffprobe_path.cache_clear()
+
+
 @pytest.fixture
 def mock_probe(mocker):
-    """Return a factory that creates a mock probe function returning a ProbeResult."""
     from convert_to_mp4.ffmpeg import ProbeResult
 
     def _factory(
@@ -36,7 +41,6 @@ def mock_probe(mocker):
 
 @pytest.fixture
 def tmp_video(tmp_path):
-    """Create a fake video file path for unit tests (no real video data)."""
     video = tmp_path / "test_video.mkv"
     video.write_bytes(b"\x00" * 1024)
     return video

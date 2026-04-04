@@ -1,7 +1,6 @@
-"""FFmpeg/ffprobe wrapper with imageio-ffmpeg integration."""
-
 from __future__ import annotations
 
+import functools
 import json
 import shutil
 import subprocess
@@ -12,17 +11,15 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class ProbeResult:
-    """Result of probing a media file."""
-
     video_codec: str
     audio_codec: str
-    audio_bitrate: int  # bps (0 if unknown)
+    audio_bitrate: int
     audio_channels: int
-    duration: float  # seconds
+    duration: float
 
 
+@functools.lru_cache(maxsize=None)
 def get_ffmpeg_path() -> str:
-    """Get path to ffmpeg binary. Prefers imageio-ffmpeg bundle, falls back to system."""
     try:
         import imageio_ffmpeg
 
@@ -40,13 +37,8 @@ def get_ffmpeg_path() -> str:
     )
 
 
+@functools.lru_cache(maxsize=None)
 def get_ffprobe_path() -> str:
-    """Get path to ffprobe binary.
-
-    imageio-ffmpeg only bundles ffmpeg, not ffprobe. Strategy:
-    1. Look for ffprobe next to the bundled ffmpeg binary
-    2. Fall back to system ffprobe
-    """
     ffmpeg_path = get_ffmpeg_path()
     ffprobe_candidate = Path(ffmpeg_path).parent / "ffprobe"
     if ffprobe_candidate.is_file():
@@ -62,7 +54,6 @@ def get_ffprobe_path() -> str:
 
 
 def probe(file_path: Path) -> ProbeResult:
-    """Probe a media file and return stream information."""
     ffprobe = get_ffprobe_path()
     result = subprocess.run(
         [
@@ -116,10 +107,6 @@ def run_conversion(
     duration: float,
     on_progress: Callable[[float], None] | None,
 ) -> bool:
-    """Run ffmpeg conversion with progress tracking.
-
-    Returns True on success, False on failure.
-    """
     ffmpeg = get_ffmpeg_path()
     cmd = [
         ffmpeg,
@@ -137,23 +124,25 @@ def run_conversion(
         stderr=subprocess.PIPE,
     )
 
-    while True:
-        line = process.stdout.readline()
-        if not line:
-            break
+    if on_progress is None:
+        process.communicate()
+    else:
+        while True:
+            line = process.stdout.readline()
+            if not line:
+                break
 
-        decoded = line.decode("utf-8", errors="replace").strip()
+            decoded = line.decode("utf-8", errors="replace").strip()
 
-        if decoded.startswith("out_time_us=") and on_progress and duration > 0:
-            try:
-                time_us = int(decoded.split("=")[1])
-                percentage = min(time_us / (duration * 1_000_000) * 100, 100.0)
-                on_progress(percentage)
-            except (ValueError, ZeroDivisionError):
-                pass
+            if decoded.startswith("out_time_us=") and duration > 0:
+                try:
+                    time_us = int(decoded.split("=")[1])
+                    percentage = min(time_us / (duration * 1_000_000) * 100, 100.0)
+                    on_progress(percentage)
+                except (ValueError, ZeroDivisionError):
+                    pass
 
-        if decoded == "progress=end":
-            break
+            if decoded == "progress=end":
+                break
 
-    return_code = process.wait()
-    return return_code == 0
+    return process.wait() == 0

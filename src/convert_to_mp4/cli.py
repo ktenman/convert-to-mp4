@@ -1,11 +1,8 @@
-"""CLI entry point using Typer."""
-
 from __future__ import annotations
 
-import time
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -28,7 +25,6 @@ console = Console()
 
 
 def generate_report(results: list[ConversionResult]) -> None:
-    """Print summary table and save report file."""
     if not results:
         return
 
@@ -40,6 +36,7 @@ def generate_report(results: list[ConversionResult]) -> None:
 
     success_count = 0
     total_saved = 0
+    non_skipped_count = 0
 
     for r in results:
         if r.skipped:
@@ -48,12 +45,14 @@ def generate_report(results: list[ConversionResult]) -> None:
             time_info = ""
         elif r.success:
             success_count += 1
+            non_skipped_count += 1
             saved = r.input_size - r.output_size
             total_saved += saved
             status = "[green]OK[/green]"
             size_info = f"{r.input_size // 1024}K -> {r.output_size // 1024}K"
             time_info = f"{r.elapsed:.1f}s"
         else:
+            non_skipped_count += 1
             status = f"[red]Failed: {r.error}[/red]"
             size_info = ""
             time_info = f"{r.elapsed:.1f}s"
@@ -62,16 +61,15 @@ def generate_report(results: list[ConversionResult]) -> None:
 
     console.print(table)
 
-    total = len([r for r in results if not r.skipped])
-    if total > 0:
-        console.print(f"\n[bold]{success_count}/{total}[/bold] converted successfully")
+    if non_skipped_count > 0:
+        console.print(f"\n[bold]{success_count}/{non_skipped_count}[/bold] converted successfully")
         if total_saved > 0:
             console.print(f"Total space saved: [green]{total_saved // 1024}K[/green]")
 
-    # Save report file
-    report_name = f"conversion_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    now = datetime.now()
+    report_name = f"conversion_report_{now.strftime('%Y%m%d_%H%M%S')}.txt"
     with open(report_name, "w") as f:
-        f.write(f"Conversion Report - {datetime.now()}\n")
+        f.write(f"Conversion Report - {now}\n")
         f.write(f"Total: {len(results)}, Success: {success_count}\n\n")
         for r in results:
             status = "OK" if r.success else ("SKIP" if r.skipped else "FAIL")
@@ -102,11 +100,11 @@ def _main(
         typer.Option("-j", "--jobs", help="Parallel conversion jobs", min=1, max=32),
     ] = 1,
     quality: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("-q", "--quality", help="Override audio bitrate (64-320)", min=64, max=320),
     ] = None,
     preset: Annotated[
-        Optional[Preset],
+        Preset | None,
         typer.Option("--preset", help="Predefined settings"),
     ] = None,
     min_quality: Annotated[
@@ -127,7 +125,6 @@ def _main(
     ] = False,
 ) -> None:
     """Convert video files to browser-compatible MP4 with smart audio quality detection."""
-    # Apply preset overrides
     if preset is not None:
         preset_config = get_preset_config(preset)
         min_quality = preset_config.min_quality
@@ -155,5 +152,4 @@ def _main(
 
 
 def main() -> None:
-    """Entry point for the CLI."""
     app()

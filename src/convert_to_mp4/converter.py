@@ -1,18 +1,15 @@
-"""Core conversion logic."""
-
 from __future__ import annotations
 
 import shutil
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from rich.console import Console
 
 from convert_to_mp4.audio import AudioInfo, calculate_optimal_bitrate, should_reencode
 from convert_to_mp4.ffmpeg import probe, run_conversion
-from convert_to_mp4.progress import create_file_progress, create_overall_progress
 
 VIDEO_EXTENSIONS = {
     ".mkv", ".avi", ".mov", ".mp4", ".webm",
@@ -24,8 +21,6 @@ console = Console()
 
 @dataclass
 class ConversionOptions:
-    """Options controlling conversion behavior."""
-
     quality: int | None = None
     min_quality: int = 128
     max_quality: int = 256
@@ -37,8 +32,6 @@ class ConversionOptions:
 
 @dataclass
 class ConversionResult:
-    """Result of converting a single file."""
-
     input_path: Path
     output_path: Path
     input_size: int = 0
@@ -52,29 +45,21 @@ class ConversionResult:
 
 
 def check_disk_space(directory: Path, file_size: int) -> bool:
-    """Check if there's enough disk space (1.5x input size)."""
     usage = shutil.disk_usage(directory)
     required = int(file_size * 1.5)
     return usage.free >= required
 
 
 def find_video_files(directory: Path, recursive: bool) -> list[Path]:
-    """Find all video files in a directory."""
-    files = []
-    if recursive:
-        for ext in VIDEO_EXTENSIONS:
-            files.extend(directory.rglob(f"*{ext}"))
-            files.extend(directory.rglob(f"*{ext.upper()}"))
-    else:
-        for ext in VIDEO_EXTENSIONS:
-            files.extend(directory.glob(f"*{ext}"))
-            files.extend(directory.glob(f"*{ext.upper()}"))
-    # Deduplicate and sort
-    return sorted(set(files))
+    glob_fn = directory.rglob if recursive else directory.glob
+    files = [
+        f for f in glob_fn("*")
+        if f.is_file() and f.suffix.lower() in VIDEO_EXTENSIONS
+    ]
+    return sorted(files)
 
 
 def _is_already_compatible(probe_result, file_path: Path) -> bool:
-    """Check if an MP4 file already has compatible codecs."""
     if file_path.suffix.lower() != ".mp4":
         return False
     return (
@@ -85,7 +70,6 @@ def _is_already_compatible(probe_result, file_path: Path) -> bool:
 
 
 def _build_ffmpeg_params(probe_result, options: ConversionOptions) -> list[str]:
-    """Build ffmpeg parameters based on probe results and options."""
     params = ["-c:v", "copy"]
 
     audio_info = AudioInfo(
@@ -113,7 +97,6 @@ def _build_ffmpeg_params(probe_result, options: ConversionOptions) -> list[str]:
 
 
 def convert_file(file_path: Path, options: ConversionOptions) -> ConversionResult:
-    """Convert a single video file to MP4."""
     output_path = file_path.with_suffix(".mp4")
     input_size = file_path.stat().st_size
 
@@ -123,33 +106,27 @@ def convert_file(file_path: Path, options: ConversionOptions) -> ConversionResul
         input_size=input_size,
     )
 
-    # Probe the file
     probe_result = probe(file_path)
     result.duration = probe_result.duration
 
-    # Check if already compatible
     if _is_already_compatible(probe_result, file_path):
         result.skipped = True
         result.skip_reason = "already compatible"
         result.success = True
         return result
 
-    # Dry run
     if options.dry_run:
         result.skipped = True
         result.skip_reason = "dry run"
         return result
 
-    # Check disk space
     if not check_disk_space(file_path.parent, input_size):
         result.success = False
         result.error = "insufficient disk space"
         return result
 
-    # Build params
     params = _build_ffmpeg_params(probe_result, options)
 
-    # Attempt conversion with error recovery (3 attempts)
     start = time.monotonic()
     attempts = [
         params,
@@ -173,17 +150,14 @@ def convert_file(file_path: Path, options: ConversionOptions) -> ConversionResul
             result.output_size = output_path.stat().st_size
             return result
 
-    # All attempts failed — clean up
     result.elapsed = time.monotonic() - start
     result.success = False
     result.error = "all conversion attempts failed"
-    if output_path.exists():
-        output_path.unlink()
+    output_path.unlink(missing_ok=True)
     return result
 
 
 def convert_directory(directory: Path, options: ConversionOptions) -> list[ConversionResult]:
-    """Convert all video files in a directory."""
     files = find_video_files(directory, options.recursive)
 
     if not files:

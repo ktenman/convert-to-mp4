@@ -1,5 +1,3 @@
-"""Audio analysis and optimal bitrate calculation."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,11 +8,9 @@ DEFAULT_BITRATE = 192
 
 @dataclass(frozen=True)
 class AudioInfo:
-    """Audio stream information."""
-
     codec: str
     channels: int
-    bitrate: int  # kbps
+    bitrate: int
 
 
 def calculate_optimal_bitrate(
@@ -23,19 +19,12 @@ def calculate_optimal_bitrate(
     min_quality: int,
     max_quality: int,
 ) -> int:
-    """Calculate optimal AAC bitrate based on source audio properties.
-
-    Applies codec-specific efficiency ratios, rounds to nearest standard
-    bitrate, and clamps to min/max bounds.
-    """
-    if not source_bitrate or source_bitrate == 0:
+    if not source_bitrate:
         return DEFAULT_BITRATE
 
-    # Convert bps to kbps if needed
     if source_bitrate > 1000:
         source_bitrate = source_bitrate // 1000
 
-    # Apply codec efficiency ratio
     match source_codec:
         case "ac3" | "eac3":
             target = source_bitrate * 2 // 3
@@ -46,7 +35,6 @@ def calculate_optimal_bitrate(
         case _:
             target = source_bitrate * 3 // 4
 
-    # Round up to nearest standard bitrate
     closest = target
     for bitrate in STANDARD_BITRATES:
         if bitrate >= target:
@@ -55,12 +43,10 @@ def calculate_optimal_bitrate(
     else:
         closest = STANDARD_BITRATES[-1]
 
-    # Clamp to bounds
     return max(min_quality, min(closest, max_quality))
 
 
 def should_reencode(audio_info: AudioInfo, force_audio: bool) -> bool:
-    """Determine if audio needs re-encoding."""
     if force_audio:
         return True
     if audio_info.codec != "aac":
