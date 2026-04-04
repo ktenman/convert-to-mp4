@@ -1,13 +1,11 @@
-import shutil
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from convert_to_mp4.converter import (
     ConversionOptions,
     ConversionResult,
-    VIDEO_EXTENSIONS,
     check_disk_space,
     convert_directory,
     convert_file,
@@ -59,12 +57,10 @@ class TestConvertFile:
     def test_converts_incompatible_audio(self, tmp_path, mocker, incompatible_probe, default_options):
         video = tmp_path / "test.mkv"
         video.write_bytes(b"\x00" * 1024)
-        output = tmp_path / "test.mp4"
 
         mocker.patch("convert_to_mp4.converter.probe", return_value=incompatible_probe)
         mock_run = mocker.patch("convert_to_mp4.converter.run_conversion", return_value=True)
         mocker.patch("convert_to_mp4.converter.check_disk_space", return_value=True)
-        # Mock output file size
         mocker.patch("pathlib.Path.stat", return_value=MagicMock(st_size=800))
 
         result = convert_file(video, default_options)
@@ -96,7 +92,6 @@ class TestConvertFile:
 
         mocker.patch("convert_to_mp4.converter.probe", return_value=incompatible_probe)
         mocker.patch("convert_to_mp4.converter.check_disk_space", return_value=True)
-        # First two attempts fail, third succeeds
         mock_run = mocker.patch(
             "convert_to_mp4.converter.run_conversion",
             side_effect=[False, False, True],
@@ -124,36 +119,36 @@ class TestConvertFile:
         assert result.success is False
         assert mock_run.call_count == 3
 
+    def test_mp4_with_incompatible_audio_uses_temp_file(self, tmp_path, mocker, incompatible_probe, default_options):
+        video = tmp_path / "test.mp4"
+        video.write_bytes(b"\x00" * 1024)
 
-class TestFindVideoFiles:
-    def test_finds_video_files_in_directory(self, tmp_path):
-        (tmp_path / "video.mkv").touch()
-        (tmp_path / "video.avi").touch()
-        (tmp_path / "readme.txt").touch()
+        mocker.patch("convert_to_mp4.converter.probe", return_value=incompatible_probe)
+        mock_run = mocker.patch("convert_to_mp4.converter.run_conversion", return_value=True)
+        mocker.patch("convert_to_mp4.converter.check_disk_space", return_value=True)
+        mocker.patch("pathlib.Path.stat", return_value=MagicMock(st_size=800))
+        mocker.patch("pathlib.Path.replace")
 
-        files = find_video_files(tmp_path, recursive=False)
-        extensions = {f.suffix for f in files}
+        result = convert_file(video, default_options)
 
-        assert len(files) == 2
-        assert extensions == {".mkv", ".avi"}
+        assert result.success is True
+        call_args = mock_run.call_args
+        output_used = call_args.kwargs.get("output_path") or call_args[0][1]
+        assert ".converting." in output_used.name
 
-    def test_recursive_finds_nested_files(self, tmp_path):
-        subdir = tmp_path / "subdir"
-        subdir.mkdir()
-        (tmp_path / "top.mkv").touch()
-        (subdir / "nested.mp4").touch()
+    def test_mp4_failure_does_not_delete_original(self, tmp_path, mocker, incompatible_probe, default_options):
+        video = tmp_path / "test.mp4"
+        video.write_bytes(b"\x00" * 1024)
 
-        files = find_video_files(tmp_path, recursive=True)
-        assert len(files) == 2
+        mocker.patch("convert_to_mp4.converter.probe", return_value=incompatible_probe)
+        mocker.patch("convert_to_mp4.converter.run_conversion", return_value=False)
+        mocker.patch("convert_to_mp4.converter.check_disk_space", return_value=True)
+        mocker.patch("pathlib.Path.unlink")
 
-    def test_non_recursive_ignores_nested(self, tmp_path):
-        subdir = tmp_path / "subdir"
-        subdir.mkdir()
-        (tmp_path / "top.mkv").touch()
-        (subdir / "nested.mp4").touch()
+        result = convert_file(video, default_options)
 
-        files = find_video_files(tmp_path, recursive=False)
-        assert len(files) == 1
+        assert result.success is False
+        assert video.exists()
 
 
 class TestConvertDirectory:
@@ -201,6 +196,37 @@ class TestConvertDirectory:
         results = convert_directory(tmp_path, options)
 
         assert len(results) == 2
+
+
+class TestFindVideoFiles:
+    def test_finds_video_files_in_directory(self, tmp_path):
+        (tmp_path / "video.mkv").touch()
+        (tmp_path / "video.avi").touch()
+        (tmp_path / "readme.txt").touch()
+
+        files = find_video_files(tmp_path, recursive=False)
+        extensions = {f.suffix for f in files}
+
+        assert len(files) == 2
+        assert extensions == {".mkv", ".avi"}
+
+    def test_recursive_finds_nested_files(self, tmp_path):
+        subdir = tmp_path / "subdir"
+        subdir.mkdir()
+        (tmp_path / "top.mkv").touch()
+        (subdir / "nested.mp4").touch()
+
+        files = find_video_files(tmp_path, recursive=True)
+        assert len(files) == 2
+
+    def test_non_recursive_ignores_nested(self, tmp_path):
+        subdir = tmp_path / "subdir"
+        subdir.mkdir()
+        (tmp_path / "top.mkv").touch()
+        (subdir / "nested.mp4").touch()
+
+        files = find_video_files(tmp_path, recursive=False)
+        assert len(files) == 1
 
 
 class TestCheckDiskSpace:

@@ -1,5 +1,3 @@
-"""Integration tests that use real ffmpeg. Run with: pytest -m integration"""
-
 import subprocess
 
 import pytest
@@ -10,7 +8,6 @@ from convert_to_mp4.ffmpeg import get_ffmpeg_path, probe
 
 @pytest.fixture
 def tiny_video(tmp_path):
-    """Generate a 1-second test video with AC3 audio using ffmpeg."""
     output = tmp_path / "test_input.mkv"
     ffmpeg = get_ffmpeg_path()
     subprocess.run(

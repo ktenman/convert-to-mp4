@@ -1,8 +1,3 @@
-"""Tests for CLI module."""
-
-from unittest.mock import MagicMock
-
-import pytest
 from typer.testing import CliRunner
 
 from convert_to_mp4.cli import app
@@ -22,9 +17,7 @@ class TestPresetOption:
         mock_convert_dir = mocker.patch(
             "convert_to_mp4.cli.convert_directory", return_value=[]
         )
-        mocker.patch(
-            "convert_to_mp4.cli.generate_report"
-        )
+        mocker.patch("convert_to_mp4.cli.generate_report")
         result = runner.invoke(app, ["--preset", "mobile", "--dry-run", "."])
         assert result.exit_code == 0
         call_args = mock_convert_dir.call_args

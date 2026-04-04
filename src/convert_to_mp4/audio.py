@@ -22,7 +22,7 @@ def calculate_optimal_bitrate(
     if not source_bitrate:
         return DEFAULT_BITRATE
 
-    if source_bitrate > 1000:
+    if source_bitrate > 10000:
         source_bitrate = source_bitrate // 1000
 
     match source_codec:

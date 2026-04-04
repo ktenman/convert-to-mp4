@@ -9,7 +9,7 @@ from pathlib import Path
 from rich.console import Console
 
 from convert_to_mp4.audio import AudioInfo, calculate_optimal_bitrate, should_reencode
-from convert_to_mp4.ffmpeg import probe, run_conversion
+from convert_to_mp4.ffmpeg import ProbeResult, probe, run_conversion
 
 VIDEO_EXTENSIONS = {
     ".mkv", ".avi", ".mov", ".mp4", ".webm",
@@ -59,7 +59,7 @@ def find_video_files(directory: Path, recursive: bool) -> list[Path]:
     return sorted(files)
 
 
-def _is_already_compatible(probe_result, file_path: Path) -> bool:
+def _is_already_compatible(probe_result: ProbeResult, file_path: Path) -> bool:
     if file_path.suffix.lower() != ".mp4":
         return False
     return (
@@ -69,7 +69,7 @@ def _is_already_compatible(probe_result, file_path: Path) -> bool:
     )
 
 
-def _build_ffmpeg_params(probe_result, options: ConversionOptions) -> list[str]:
+def _build_ffmpeg_params(probe_result: ProbeResult, options: ConversionOptions) -> list[str]:
     params = ["-c:v", "copy"]
 
     audio_info = AudioInfo(
@@ -97,12 +97,14 @@ def _build_ffmpeg_params(probe_result, options: ConversionOptions) -> list[str]:
 
 
 def convert_file(file_path: Path, options: ConversionOptions) -> ConversionResult:
-    output_path = file_path.with_suffix(".mp4")
+    final_output = file_path.with_suffix(".mp4")
+    is_same_path = file_path.resolve() == final_output.resolve()
+    temp_output = file_path.with_suffix(".converting.mp4") if is_same_path else final_output
     input_size = file_path.stat().st_size
 
     result = ConversionResult(
         input_path=file_path,
-        output_path=output_path,
+        output_path=final_output,
         input_size=input_size,
     )
 
@@ -139,21 +141,23 @@ def convert_file(file_path: Path, options: ConversionOptions) -> ConversionResul
     for attempt_params in attempts:
         success = run_conversion(
             input_path=file_path,
-            output_path=output_path,
+            output_path=temp_output,
             params=attempt_params,
             duration=probe_result.duration,
             on_progress=None,
         )
         if success:
+            if is_same_path:
+                temp_output.replace(final_output)
             result.elapsed = time.monotonic() - start
             result.success = True
-            result.output_size = output_path.stat().st_size
+            result.output_size = final_output.stat().st_size
             return result
 
     result.elapsed = time.monotonic() - start
     result.success = False
     result.error = "all conversion attempts failed"
-    output_path.unlink(missing_ok=True)
+    temp_output.unlink(missing_ok=True)
     return result
 
 
