@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "convert-to-mp4"
+version = "0.1.0"
+description = "Smart video converter with automatic audio quality detection"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    "typer[all]>=0.12",
+    "imageio-ffmpeg>=0.5",
+]
+
+[project.scripts]
+convert-to-mp4 = "convert_to_mp4.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-mock>=3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/convert_to_mp4"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: tests requiring real ffmpeg"]
