@@ -13,7 +13,7 @@ jobs:
     if: github.actor == 'dependabot[bot]'
     steps:
       - name: Wait for CI checks to pass
-        uses: lewagon/wait-on-check-action@84840133801bb697fed25fd0e21078b85f5831a0 # v1.6.0
+        uses: lewagon/wait-on-check-action@a08fbe2b86f9336198f33be6ad9c16b96f92799c # v1.6.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           running-workflow-name: auto-merge
