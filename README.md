@@ -7,7 +7,7 @@ Converts video files to browser-compatible MP4 with intelligent audio bitrate se
 ## Installation
 
 ```bash
-uv tool install convert-to-mp4
+uv tool install git+https://github.com/ktenman/convert-to-mp4
 ```
 
 ## Usage
