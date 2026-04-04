@@ -14,9 +14,7 @@ class TestHelpOutput:
 
 class TestPresetOption:
     def test_preset_mobile(self, mocker):
-        mock_convert_dir = mocker.patch(
-            "convert_to_mp4.cli.convert_directory", return_value=[]
-        )
+        mock_convert_dir = mocker.patch("convert_to_mp4.cli.convert_directory", return_value=[])
         mocker.patch("convert_to_mp4.cli.generate_report")
         result = runner.invoke(app, ["--preset", "mobile", "--dry-run", "."])
         assert result.exit_code == 0
@@ -32,9 +30,7 @@ class TestPresetOption:
 
 class TestQualityOption:
     def test_quality_override(self, mocker):
-        mock_convert_dir = mocker.patch(
-            "convert_to_mp4.cli.convert_directory", return_value=[]
-        )
+        mock_convert_dir = mocker.patch("convert_to_mp4.cli.convert_directory", return_value=[])
         mocker.patch("convert_to_mp4.cli.generate_report")
         result = runner.invoke(app, ["-q", "192", "--dry-run", "."])
         assert result.exit_code == 0
@@ -63,9 +59,7 @@ class TestFileAndDirectoryOptions:
         mock_convert_single.assert_called_once()
 
     def test_d_flag_converts_directory(self, tmp_path, mocker):
-        mock_convert_dir = mocker.patch(
-            "convert_to_mp4.cli.convert_directory", return_value=[]
-        )
+        mock_convert_dir = mocker.patch("convert_to_mp4.cli.convert_directory", return_value=[])
         mocker.patch("convert_to_mp4.cli.generate_report")
 
         result = runner.invoke(app, ["-d", str(tmp_path)])

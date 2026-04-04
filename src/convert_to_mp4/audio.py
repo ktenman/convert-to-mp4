@@ -51,6 +51,4 @@ def should_reencode(audio_info: AudioInfo, force_audio: bool) -> bool:
         return True
     if audio_info.codec != "aac":
         return True
-    if audio_info.channels > 2:
-        return True
-    return False
+    return audio_info.channels > 2

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class Preset(str, Enum):
+class Preset(StrEnum):
     TV = "tv"
     MOBILE = "mobile"
     ARCHIVE = "archive"
