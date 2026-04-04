@@ -118,10 +118,12 @@ def run_conversion(
         str(output_path),
     ]
 
+    stderr_target = subprocess.PIPE if on_progress is None else subprocess.DEVNULL
+
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=stderr_target,
     )
 
     if on_progress is None:
