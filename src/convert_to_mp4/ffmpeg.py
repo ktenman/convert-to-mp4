@@ -18,7 +18,7 @@ class ProbeResult:
     duration: float
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def get_ffmpeg_path() -> str:
     try:
         import imageio_ffmpeg
@@ -37,7 +37,7 @@ def get_ffmpeg_path() -> str:
     )
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def get_ffprobe_path() -> str:
     ffmpeg_path = get_ffmpeg_path()
     ffprobe_candidate = Path(ffmpeg_path).parent / "ffprobe"
@@ -48,9 +48,7 @@ def get_ffprobe_path() -> str:
     if system_path:
         return system_path
 
-    raise RuntimeError(
-        "ffprobe not found. Install ffmpeg/ffprobe on your system."
-    )
+    raise RuntimeError("ffprobe not found. Install ffmpeg/ffprobe on your system.")
 
 
 def probe(file_path: Path) -> ProbeResult:
@@ -58,8 +56,10 @@ def probe(file_path: Path) -> ProbeResult:
     result = subprocess.run(
         [
             ffprobe,
-            "-v", "quiet",
-            "-print_format", "json",
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
             "-show_streams",
             "-show_format",
             str(file_path),
@@ -110,9 +110,11 @@ def run_conversion(
     ffmpeg = get_ffmpeg_path()
     cmd = [
         ffmpeg,
-        "-i", str(input_path),
+        "-i",
+        str(input_path),
         *params,
-        "-progress", "pipe:1",
+        "-progress",
+        "pipe:1",
         "-nostats",
         "-y",
         str(output_path),
