@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -10,7 +11,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: "!startsWith(github.event.head_commit.message, 'Bump version')"
+    if: github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'Bump version')
     steps:
       # RELEASE_TOKEN: Fine-Grained PAT with 'contents: write' permission.
       # Required because commits pushed with GITHUB_TOKEN don't trigger workflows.
@@ -26,7 +27,7 @@ jobs:
 
       - run: uv sync --dev
 
-      - name: Bump patch version
+      - name: Bump minor version
         id: bump
         run: |
           CURRENT=$(uv run python -c "
@@ -36,8 +37,8 @@ jobs:
           ")
 
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          PATCH=$((PATCH + 1))
-          NEW="${MAJOR}.${MINOR}.${PATCH}"
+          MINOR=$((MINOR + 1))
+          NEW="${MAJOR}.${MINOR}.0"
 
           uv run python -c "
           import re
