@@ -16,6 +16,12 @@ VIDEO_EXTENSIONS = {
     ".flv", ".wmv", ".mpg", ".mpeg", ".m4v", ".3gp",
 }
 
+FALLBACK_PARAMS = [
+    "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+    "-c:a", "aac", "-ac", "2", "-b:a", "192k",
+    "-movflags", "+faststart",
+]
+
 console = Console()
 
 
@@ -133,9 +139,7 @@ def convert_file(file_path: Path, options: ConversionOptions) -> ConversionResul
     attempts = [
         params,
         [*params, "-err_detect", "ignore_err"],
-        ["-c:v", "libx264", "-preset", "fast", "-crf", "23",
-         "-c:a", "aac", "-ac", "2", "-b:a", "192k",
-         "-movflags", "+faststart"],
+        FALLBACK_PARAMS,
     ]
 
     for attempt_params in attempts:

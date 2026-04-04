@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from convert_to_mp4.ffmpeg import (
-    ProbeResult,
     get_ffmpeg_path,
     get_ffprobe_path,
     probe,
