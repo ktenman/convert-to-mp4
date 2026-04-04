@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
-import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -27,8 +26,6 @@ from convert_to_mp4.presets import Preset, get_preset_config
 logger = logging.getLogger(__name__)
 
 GITHUB_REPO = "ktenman/convert-to-mp4"
-CHECK_INTERVAL = 86400  # 24 hours
-CACHE_FILE = Path.home() / ".cache" / "convert-to-mp4" / "last-update-check"
 
 app = typer.Typer(
     name="convert-to-mp4",
@@ -97,23 +94,8 @@ def generate_report(results: list[ConversionResult], *, dry_run: bool = False) -
         console.print("[yellow]Could not save report file[/yellow]")
 
 
-def _should_check_update() -> bool:
-    try:
-        return time.time() - CACHE_FILE.stat().st_mtime > CHECK_INTERVAL
-    except FileNotFoundError:
-        return True
-
-
-def _mark_update_checked() -> None:
-    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE_FILE.touch()
-
-
 def _check_and_upgrade(current: str) -> None:
     """Check GitHub for latest release and auto-upgrade if outdated."""
-    if not _should_check_update():
-        return
-
     try:
         req = urllib.request.Request(
             f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
@@ -130,8 +112,6 @@ def _check_and_upgrade(current: str) -> None:
     except Exception:
         logger.debug("Failed to check for updates", exc_info=True)
         return
-
-    _mark_update_checked()
 
     if Version(current) >= Version(latest):
         logger.info("convert-to-mp4 is up to date (v%s)", current)
