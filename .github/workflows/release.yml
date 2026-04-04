@@ -27,7 +27,7 @@ jobs:
 
       - run: uv sync --dev
 
-      - name: Bump minor version
+      - name: Bump patch version
         id: bump
         run: |
           CURRENT=$(uv run python -c "
@@ -37,8 +37,8 @@ jobs:
           ")
 
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          MINOR=$((MINOR + 1))
-          NEW="${MAJOR}.${MINOR}.0"
+          PATCH=$((PATCH + 1))
+          NEW="${MAJOR}.${MINOR}.${PATCH}"
 
           uv run python -c "
           import re
