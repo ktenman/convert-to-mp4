@@ -12,6 +12,7 @@ license = "MIT"
 dependencies = [
     "typer[all]>=0.12",
     "imageio-ffmpeg>=0.5",
+    "packaging>=24.0",
 ]
 
 [project.scripts]

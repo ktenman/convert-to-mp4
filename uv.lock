@@ -34,10 +34,11 @@ wheels = [
 
 [[package]]
 name = "convert-to-mp4"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "imageio-ffmpeg" },
+    { name = "packaging" },
     { name = "typer" },
 ]
 
@@ -51,6 +52,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "imageio-ffmpeg", specifier = ">=0.5" },
+    { name = "packaging", specifier = ">=24.0" },
     { name = "typer", extras = ["all"], specifier = ">=0.12" },
 ]
 
