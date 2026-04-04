@@ -7,29 +7,13 @@ from unittest.mock import MagicMock
 import click.exceptions
 import pytest
 
-from convert_to_mp4.cli import _check_and_upgrade, _should_check_update
+from convert_to_mp4.cli import _check_and_upgrade
 
 
 @pytest.fixture(autouse=True)
 def _allow_upgrade_check(mocker):
     """Override the global autouse mock so these tests can call the real function."""
     mocker.stopall()
-    mocker.patch("convert_to_mp4.cli._should_check_update", return_value=True)
-    mocker.patch("convert_to_mp4.cli._mark_update_checked")
-
-
-class TestShouldCheckUpdate:
-    def test_returns_true_when_no_cache_file(self, tmp_path, mocker):
-        mocker.stopall()
-        mocker.patch("convert_to_mp4.cli.CACHE_FILE", tmp_path / "nonexistent")
-        assert _should_check_update() is True
-
-    def test_returns_false_when_recently_checked(self, tmp_path, mocker):
-        mocker.stopall()
-        cache = tmp_path / "last-check"
-        cache.touch()
-        mocker.patch("convert_to_mp4.cli.CACHE_FILE", cache)
-        assert _should_check_update() is False
 
 
 class TestCheckAndUpgrade:
