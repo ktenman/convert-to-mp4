@@ -152,9 +152,16 @@ class TestConvertFile:
 
 
 class TestConvertDirectory:
-    def test_returns_empty_for_no_video_files(self, tmp_path, mocker):
+    @pytest.fixture(autouse=True)
+    def _quiet_console(self, mocker):
+        from io import StringIO
+        from rich.console import Console as RichConsole
+
+        quiet = RichConsole(file=StringIO(), no_color=True)
+        mocker.patch("convert_to_mp4.converter.console", quiet)
+
+    def test_returns_empty_for_no_video_files(self, tmp_path):
         (tmp_path / "readme.txt").touch()
-        mocker.patch("convert_to_mp4.converter.console")
 
         results = convert_directory(tmp_path, ConversionOptions())
         assert results == []
@@ -171,7 +178,6 @@ class TestConvertDirectory:
                 success=True,
             ),
         )
-        mocker.patch("convert_to_mp4.converter.console")
 
         results = convert_directory(tmp_path, ConversionOptions())
 
@@ -190,7 +196,6 @@ class TestConvertDirectory:
                 success=True,
             ),
         )
-        mocker.patch("convert_to_mp4.converter.console")
 
         options = ConversionOptions(jobs=2)
         results = convert_directory(tmp_path, options)

@@ -12,7 +12,7 @@ from convert_to_mp4.converter import (
     ConversionOptions,
     ConversionResult,
     convert_directory,
-    convert_file,
+    convert_single,
 )
 from convert_to_mp4.presets import Preset, get_preset_config
 
@@ -161,7 +161,7 @@ def _main(
     )
 
     if path.is_file():
-        result = convert_file(path, options)
+        result = convert_single(path, options)
         generate_report([result], dry_run=dry_run)
     else:
         results = convert_directory(path, options)

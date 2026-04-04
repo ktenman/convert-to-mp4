@@ -52,15 +52,15 @@ class TestFileAndDirectoryOptions:
         video = tmp_path / "test.mkv"
         video.write_bytes(b"\x00" * 1024)
 
-        mock_convert_file = mocker.patch(
-            "convert_to_mp4.cli.convert_file",
+        mock_convert_single = mocker.patch(
+            "convert_to_mp4.cli.convert_single",
             return_value=mocker.MagicMock(success=True, skipped=False),
         )
         mocker.patch("convert_to_mp4.cli.generate_report")
 
         result = runner.invoke(app, ["-f", str(video)])
         assert result.exit_code == 0
-        mock_convert_file.assert_called_once()
+        mock_convert_single.assert_called_once()
 
     def test_d_flag_converts_directory(self, tmp_path, mocker):
         mock_convert_dir = mocker.patch(

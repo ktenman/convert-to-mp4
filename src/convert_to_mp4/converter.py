@@ -2,11 +2,22 @@ from __future__ import annotations
 
 import shutil
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 from convert_to_mp4.audio import AudioInfo, calculate_optimal_bitrate, should_reencode
 from convert_to_mp4.ffmpeg import ProbeResult, probe, run_conversion
@@ -102,7 +113,40 @@ def _build_ffmpeg_params(probe_result: ProbeResult, options: ConversionOptions) 
     return params
 
 
-def convert_file(file_path: Path, options: ConversionOptions) -> ConversionResult:
+def _run_with_retries(
+    file_path: Path,
+    output_path: Path,
+    params: list[str],
+    duration: float,
+    on_progress: Callable[[float], None] | None,
+) -> bool:
+    attempts = [
+        params,
+        [*params, "-err_detect", "ignore_err"],
+        FALLBACK_PARAMS,
+    ]
+
+    for attempt_params in attempts:
+        if on_progress:
+            on_progress(0.0)
+        success = run_conversion(
+            input_path=file_path,
+            output_path=output_path,
+            params=attempt_params,
+            duration=duration,
+            on_progress=on_progress,
+        )
+        if success:
+            return True
+
+    return False
+
+
+def convert_file(
+    file_path: Path,
+    options: ConversionOptions,
+    on_progress: Callable[[float], None] | None = None,
+) -> ConversionResult:
     final_output = file_path.with_suffix(".mp4")
     is_same_path = file_path.resolve() == final_output.resolve()
     temp_output = file_path.with_suffix(".converting.mp4") if is_same_path else final_output
@@ -134,34 +178,59 @@ def convert_file(file_path: Path, options: ConversionOptions) -> ConversionResul
         return result
 
     params = _build_ffmpeg_params(probe_result, options)
-
     start = time.monotonic()
-    attempts = [
-        params,
-        [*params, "-err_detect", "ignore_err"],
-        FALLBACK_PARAMS,
-    ]
 
-    for attempt_params in attempts:
-        success = run_conversion(
-            input_path=file_path,
-            output_path=temp_output,
-            params=attempt_params,
-            duration=probe_result.duration,
-            on_progress=None,
-        )
-        if success:
-            if is_same_path:
-                temp_output.replace(final_output)
-            result.elapsed = time.monotonic() - start
-            result.success = True
-            result.output_size = final_output.stat().st_size
-            return result
+    success = _run_with_retries(
+        file_path, temp_output, params, probe_result.duration, on_progress,
+    )
+
+    if success:
+        if is_same_path:
+            temp_output.replace(final_output)
+        result.elapsed = time.monotonic() - start
+        result.success = True
+        result.output_size = final_output.stat().st_size
+        return result
 
     result.elapsed = time.monotonic() - start
     result.success = False
     result.error = "all conversion attempts failed"
     temp_output.unlink(missing_ok=True)
+    return result
+
+
+def convert_single(file_path: Path, options: ConversionOptions) -> ConversionResult:
+    console.print(f"Converting [cyan]{file_path.name}[/cyan]")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(bar_width=40),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(file_path.name, total=100.0)
+
+        def on_progress(percentage: float) -> None:
+            progress.update(task, completed=percentage)
+
+        result = convert_file(file_path, options, on_progress=on_progress)
+        progress.update(task, completed=100.0)
+
+    if result.skipped:
+        console.print(f"[yellow]Skipped ({result.skip_reason})[/yellow]")
+    elif result.success:
+        saved = result.input_size - result.output_size
+        console.print(
+            f"[green]Done[/green] in {result.elapsed:.1f}s "
+            f"({result.input_size // 1024}K -> {result.output_size // 1024}K, "
+            f"saved {saved // 1024}K)"
+        )
+    else:
+        console.print(f"[red]Failed: {result.error}[/red]")
+
     return result
 
 
@@ -175,16 +244,46 @@ def convert_directory(directory: Path, options: ConversionOptions) -> list[Conve
     console.print(f"Found [green]{len(files)}[/green] video file(s) to process")
 
     results = []
+
     if options.jobs > 1:
-        with ThreadPoolExecutor(max_workers=options.jobs) as executor:
-            futures = {
-                executor.submit(convert_file, f, options): f for f in files
-            }
-            for future in as_completed(futures):
-                results.append(future.result())
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold green]{task.description}"),
+            BarColumn(bar_width=40),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            overall = progress.add_task("Overall", total=len(files))
+
+            with ThreadPoolExecutor(max_workers=options.jobs) as executor:
+                futures = {
+                    executor.submit(convert_file, f, options): f for f in files
+                }
+                for future in as_completed(futures):
+                    results.append(future.result())
+                    progress.advance(overall)
     else:
-        for file_path in files:
-            result = convert_file(file_path, options)
-            results.append(result)
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(bar_width=40),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            overall = progress.add_task("Overall", total=len(files))
+
+            for file_path in files:
+                file_task = progress.add_task(file_path.name, total=100.0)
+
+                def on_progress(percentage: float, _task=file_task) -> None:
+                    progress.update(_task, completed=percentage)
+
+                result = convert_file(file_path, options, on_progress=on_progress)
+                progress.update(file_task, completed=100.0, visible=False)
+                progress.advance(overall)
+                results.append(result)
 
     return results
