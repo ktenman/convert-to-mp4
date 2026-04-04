@@ -166,12 +166,27 @@ def _validate_quality_range(min_q: int, max_q: int) -> None:
         )
 
 
+def _verbose_callback(value: bool) -> None:
+    if value:
+        logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+
+
 @app.command()
 def _main(
     path: Annotated[
         Path,
         typer.Argument(help="File or directory to convert", exists=True),
     ] = Path("."),
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Enable debug logging",
+            callback=_verbose_callback,
+            is_eager=True,
+        ),
+    ] = False,
     file: Annotated[
         Path | None,
         typer.Option("-f", "--file", help="Convert a specific file", exists=True),
