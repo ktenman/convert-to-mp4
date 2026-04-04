@@ -47,6 +47,32 @@ class TestQualityOption:
         assert result.exit_code != 0
 
 
+class TestFileAndDirectoryOptions:
+    def test_f_flag_converts_specific_file(self, tmp_path, mocker):
+        video = tmp_path / "test.mkv"
+        video.write_bytes(b"\x00" * 1024)
+
+        mock_convert_file = mocker.patch(
+            "convert_to_mp4.cli.convert_file",
+            return_value=mocker.MagicMock(success=True, skipped=False),
+        )
+        mocker.patch("convert_to_mp4.cli.generate_report")
+
+        result = runner.invoke(app, ["-f", str(video)])
+        assert result.exit_code == 0
+        mock_convert_file.assert_called_once()
+
+    def test_d_flag_converts_directory(self, tmp_path, mocker):
+        mock_convert_dir = mocker.patch(
+            "convert_to_mp4.cli.convert_directory", return_value=[]
+        )
+        mocker.patch("convert_to_mp4.cli.generate_report")
+
+        result = runner.invoke(app, ["-d", str(tmp_path)])
+        assert result.exit_code == 0
+        mock_convert_dir.assert_called_once()
+
+
 class TestMinMaxQualityValidation:
     def test_min_greater_than_max_rejected(self, mocker):
         mocker.patch("convert_to_mp4.cli.convert_directory", return_value=[])

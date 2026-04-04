@@ -96,6 +96,14 @@ def _main(
         Path,
         typer.Argument(help="File or directory to convert", exists=True),
     ] = Path("."),
+    file: Annotated[
+        Path | None,
+        typer.Option("-f", "--file", help="Convert a specific file", exists=True),
+    ] = None,
+    directory: Annotated[
+        Path | None,
+        typer.Option("-d", "--directory", help="Convert all videos in directory", exists=True),
+    ] = None,
     recursive: Annotated[
         bool,
         typer.Option("-r", "--recursive", help="Recurse into subdirectories"),
@@ -130,6 +138,10 @@ def _main(
     ] = False,
 ) -> None:
     """Convert video files to browser-compatible MP4 with smart audio quality detection."""
+    if file is not None:
+        path = file
+    elif directory is not None:
+        path = directory
     if preset is not None:
         preset_config = get_preset_config(preset)
         min_quality = preset_config.min_quality
