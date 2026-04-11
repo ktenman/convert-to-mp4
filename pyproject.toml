@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
-    "typer[all]>=0.12",
+    "typer[all]>=0.24.1",
     "imageio-ffmpeg>=0.6.0",
     "packaging>=24.0",
 ]
