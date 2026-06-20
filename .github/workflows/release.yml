@@ -15,7 +15,7 @@ jobs:
     steps:
       # RELEASE_TOKEN: Fine-Grained PAT with 'contents: write' permission.
       # Required because commits pushed with GITHUB_TOKEN don't trigger workflows.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN }}
