@@ -123,7 +123,7 @@ def _needs_audio_reencode(probe_result: ProbeResult, options: ConversionOptions)
 def _build_ffmpeg_params(
     probe_result: ProbeResult,
     options: ConversionOptions,
-    loudness: LoudnessStats | None = None,
+    loudness: LoudnessStats | None,
 ) -> list[str]:
     params = ["-c:v", "copy"]
 
@@ -139,7 +139,7 @@ def _build_ffmpeg_params(
             )
         params.extend(["-c:a", "aac"])
         if loudness is not None:
-            params.extend(["-af", build_loudnorm_filter(loudness), "-ar", "48000"])
+            params.extend(["-af", build_loudnorm_filter(loudness)])
         else:
             params.extend(["-ac", "2"])
         params.extend(["-b:a", f"{target_bitrate}k"])

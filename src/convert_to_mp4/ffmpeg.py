@@ -101,11 +101,6 @@ def probe(file_path: Path) -> ProbeResult:
     )
 
 
-LOUDNESS_TARGET_I = -16.0
-LOUDNESS_TARGET_TP = -1.5
-LOUDNESS_TARGET_LRA = 11.0
-
-
 @dataclass(frozen=True)
 class LoudnessStats:
     input_i: float
@@ -116,16 +111,14 @@ class LoudnessStats:
 
 
 def build_loudnorm_filter(stats: LoudnessStats | None = None) -> str:
-    base = (
-        "aformat=channel_layouts=stereo,"
-        f"loudnorm=I={LOUDNESS_TARGET_I:g}:TP={LOUDNESS_TARGET_TP:g}:LRA={LOUDNESS_TARGET_LRA:g}"
-    )
+    base = "aformat=channel_layouts=stereo,loudnorm=I=-16:TP=-1.5:LRA=11"
     if stats is None:
         return f"{base}:print_format=json"
+    # loudnorm's dynamic mode outputs 192 kHz, which AAC can't encode
     return (
         f"{base}:measured_I={stats.input_i:g}:measured_TP={stats.input_tp:g}"
         f":measured_LRA={stats.input_lra:g}:measured_thresh={stats.input_thresh:g}"
-        f":offset={stats.target_offset:g}:linear=true"
+        f":offset={stats.target_offset:g}:linear=true,aresample=48000"
     )
 
 

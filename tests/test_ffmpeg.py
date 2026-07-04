@@ -157,6 +157,7 @@ class TestBuildLoudnormFilter:
         assert "measured_thresh=-38.1" in filter_str
         assert "offset=0.4" in filter_str
         assert "linear=true" in filter_str
+        assert filter_str.endswith(",aresample=48000")
         assert "print_format" not in filter_str
 
 

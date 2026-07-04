@@ -206,7 +206,7 @@ class TestLoudnessNormalization:
         assert "loudnorm" in filter_str
         assert "measured_I=-27.2" in filter_str
         assert "linear=true" in filter_str
-        assert params[params.index("-ar") + 1] == "48000"
+        assert "aresample=48000" in filter_str
         assert "-ac" not in params
 
     def test_failed_measurement_falls_back_to_plain_downmix(
