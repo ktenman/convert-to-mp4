@@ -218,6 +218,25 @@ class TestMeasureLoudness:
 
         assert measure_loudness(Path("/fake/video.mkv")) is None
 
+    def test_reports_progress_when_callback_given(self, mocker):
+        mocker.patch("convert_to_mp4.ffmpeg.get_ffmpeg_path", return_value="/usr/bin/ffmpeg")
+        mock_popen = MagicMock()
+        mock_popen.stdout.readline.side_effect = [
+            b"out_time_us=30000000\n",
+            b"progress=end\n",
+            b"",
+        ]
+        mock_popen.stderr.read.return_value = SAMPLE_LOUDNORM_STDERR.encode()
+        mock_popen.wait.return_value = 0
+        mocker.patch("subprocess.Popen", return_value=mock_popen)
+
+        callback = MagicMock()
+        stats = measure_loudness(Path("/fake/video.mkv"), duration=60.0, on_progress=callback)
+
+        callback.assert_called_with(50.0)
+        assert stats is not None
+        assert stats.target_offset == 0.68
+
 
 class TestRunConversion:
     def test_builds_correct_command(self, mocker):

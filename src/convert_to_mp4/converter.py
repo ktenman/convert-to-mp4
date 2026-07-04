@@ -183,6 +183,7 @@ def convert_file(
     file_path: Path,
     options: ConversionOptions,
     on_progress: Callable[[float], None] | None = None,
+    on_phase: Callable[[str], None] | None = None,
 ) -> ConversionResult:
     final_output = file_path.with_suffix(".mp4")
     is_same_path = file_path.resolve() == final_output.resolve()
@@ -216,8 +217,12 @@ def convert_file(
 
     loudness = None
     if options.normalize and _needs_audio_reencode(probe_result, options):
-        loudness = measure_loudness(file_path)
+        if on_phase:
+            on_phase("measuring loudness")
+        loudness = measure_loudness(file_path, probe_result.duration, on_progress)
 
+    if on_phase:
+        on_phase("converting")
     params = _build_ffmpeg_params(probe_result, options, loudness)
     start = time.monotonic()
 
@@ -261,7 +266,10 @@ def convert_single(file_path: Path, options: ConversionOptions) -> ConversionRes
         def on_progress(percentage: float) -> None:
             progress.update(task, completed=percentage)
 
-        result = convert_file(file_path, options, on_progress=on_progress)
+        def on_phase(phase: str) -> None:
+            progress.update(task, description=f"{file_path.name} ({phase})")
+
+        result = convert_file(file_path, options, on_progress=on_progress, on_phase=on_phase)
         progress.update(task, completed=100.0)
 
     if result.skipped:
@@ -324,7 +332,12 @@ def convert_directory(directory: Path, options: ConversionOptions) -> list[Conve
                 def on_progress(percentage: float, _task=file_task) -> None:
                     progress.update(_task, completed=percentage)
 
-                result = convert_file(file_path, options, on_progress=on_progress)
+                def on_phase(phase: str, _task=file_task, _name=file_path.name) -> None:
+                    progress.update(_task, description=f"{_name} ({phase})")
+
+                result = convert_file(
+                    file_path, options, on_progress=on_progress, on_phase=on_phase
+                )
                 progress.update(file_task, completed=100.0, visible=False)
                 progress.advance(overall)
                 results.append(result)

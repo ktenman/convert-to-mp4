@@ -5,9 +5,11 @@ import json
 import math
 import shutil
 import subprocess
+import threading
 from collections.abc import Callable
 from dataclasses import astuple, dataclass
 from pathlib import Path
+from typing import IO
 
 
 @dataclass(frozen=True)
@@ -145,31 +147,77 @@ def _parse_loudnorm_stats(stderr: str) -> LoudnessStats | None:
     return stats
 
 
-def measure_loudness(file_path: Path) -> LoudnessStats | None:
+def _read_progress(
+    stdout: IO[bytes],
+    duration: float,
+    on_progress: Callable[[float], None],
+) -> None:
+    while True:
+        line = stdout.readline()
+        if not line:
+            break
+
+        decoded = line.decode("utf-8", errors="replace").strip()
+
+        if decoded.startswith("out_time_us=") and duration > 0:
+            try:
+                time_us = int(decoded.split("=")[1])
+                percentage = min(time_us / (duration * 1_000_000) * 100, 100.0)
+                on_progress(percentage)
+            except (ValueError, ZeroDivisionError):
+                pass
+
+        if decoded == "progress=end":
+            break
+
+
+def measure_loudness(
+    file_path: Path,
+    duration: float = 0.0,
+    on_progress: Callable[[float], None] | None = None,
+) -> LoudnessStats | None:
     ffmpeg = get_ffmpeg_path()
-    result = subprocess.run(
-        [
-            ffmpeg,
-            "-hide_banner",
-            "-nostats",
-            "-i",
-            str(file_path),
-            "-vn",
-            "-sn",
-            "-dn",
-            "-af",
-            build_loudnorm_filter(),
-            "-f",
-            "null",
-            "-",
-        ],
-        capture_output=True,
-        text=True,
+    cmd = [
+        ffmpeg,
+        "-hide_banner",
+        "-nostats",
+        "-i",
+        str(file_path),
+        "-vn",
+        "-sn",
+        "-dn",
+        "-af",
+        build_loudnorm_filter(),
+    ]
+
+    if on_progress is None:
+        result = subprocess.run([*cmd, "-f", "null", "-"], capture_output=True, text=True)
+        if result.returncode != 0:
+            return None
+        return _parse_loudnorm_stats(result.stderr)
+
+    process = subprocess.Popen(
+        [*cmd, "-progress", "pipe:1", "-f", "null", "-"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
-    if result.returncode != 0:
+    stderr_data = b""
+
+    def drain_stderr() -> None:
+        nonlocal stderr_data
+        stderr_data = process.stderr.read()
+
+    # stderr must drain concurrently: decode-error spam from a damaged file
+    # could fill the pipe and deadlock ffmpeg while we read stdout progress
+    drain = threading.Thread(target=drain_stderr)
+    drain.start()
+    _read_progress(process.stdout, duration, on_progress)
+    drain.join()
+
+    if process.wait() != 0:
         return None
-    return _parse_loudnorm_stats(result.stderr)
+    return _parse_loudnorm_stats(stderr_data.decode("utf-8", errors="replace"))
 
 
 def run_conversion(
@@ -203,22 +251,6 @@ def run_conversion(
     if on_progress is None:
         process.communicate()
     else:
-        while True:
-            line = process.stdout.readline()
-            if not line:
-                break
-
-            decoded = line.decode("utf-8", errors="replace").strip()
-
-            if decoded.startswith("out_time_us=") and duration > 0:
-                try:
-                    time_us = int(decoded.split("=")[1])
-                    percentage = min(time_us / (duration * 1_000_000) * 100, 100.0)
-                    on_progress(percentage)
-                except (ValueError, ZeroDivisionError):
-                    pass
-
-            if decoded == "progress=end":
-                break
+        _read_progress(process.stdout, duration, on_progress)
 
     return process.wait() == 0
