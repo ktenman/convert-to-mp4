@@ -5,9 +5,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from convert_to_mp4.audio import LoudnessStats
 from convert_to_mp4.ffmpeg import (
     get_ffmpeg_path,
     get_ffprobe_path,
+    measure_loudness,
     probe,
     run_conversion,
 )
@@ -124,6 +126,64 @@ class TestProbe:
         )
         with pytest.raises(RuntimeError, match="ffprobe failed"):
             probe(Path("/fake/video.mkv"))
+
+
+SAMPLE_LOUDNORM_STDERR = """\
+[Parsed_loudnorm_1 @ 0x600002d5c000]
+{
+\t"input_i" : "-27.23",
+\t"input_tp" : "-4.91",
+\t"input_lra" : "16.10",
+\t"input_thresh" : "-38.11",
+\t"output_i" : "-16.68",
+\t"output_tp" : "-1.50",
+\t"output_lra" : "12.90",
+\t"output_thresh" : "-27.40",
+\t"normalization_type" : "dynamic",
+\t"target_offset" : "0.68"
+}
+"""
+
+
+class TestMeasureLoudness:
+    def test_parses_loudnorm_json(self, mocker):
+        mocker.patch("convert_to_mp4.ffmpeg.get_ffmpeg_path", return_value="/usr/bin/ffmpeg")
+        mocker.patch(
+            "subprocess.run",
+            return_value=MagicMock(returncode=0, stderr=SAMPLE_LOUDNORM_STDERR),
+        )
+
+        stats = measure_loudness(Path("/fake/video.mkv"))
+
+        assert stats == LoudnessStats(
+            input_i=-27.23,
+            input_tp=-4.91,
+            input_lra=16.10,
+            input_thresh=-38.11,
+            target_offset=0.68,
+        )
+
+    def test_returns_none_on_ffmpeg_failure(self, mocker):
+        mocker.patch("convert_to_mp4.ffmpeg.get_ffmpeg_path", return_value="/usr/bin/ffmpeg")
+        mocker.patch("subprocess.run", return_value=MagicMock(returncode=1, stderr="boom"))
+
+        assert measure_loudness(Path("/fake/video.mkv")) is None
+
+    def test_returns_none_when_json_missing(self, mocker):
+        mocker.patch("convert_to_mp4.ffmpeg.get_ffmpeg_path", return_value="/usr/bin/ffmpeg")
+        mocker.patch(
+            "subprocess.run",
+            return_value=MagicMock(returncode=0, stderr="no json here"),
+        )
+
+        assert measure_loudness(Path("/fake/video.mkv")) is None
+
+    def test_returns_none_on_non_finite_values(self, mocker):
+        stderr = SAMPLE_LOUDNORM_STDERR.replace('"-27.23"', '"-inf"')
+        mocker.patch("convert_to_mp4.ffmpeg.get_ffmpeg_path", return_value="/usr/bin/ffmpeg")
+        mocker.patch("subprocess.run", return_value=MagicMock(returncode=0, stderr=stderr))
+
+        assert measure_loudness(Path("/fake/video.mkv")) is None
 
 
 class TestRunConversion:

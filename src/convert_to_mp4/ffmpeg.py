@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import functools
 import json
+import math
 import shutil
 import subprocess
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
+
+from convert_to_mp4.audio import LoudnessStats, build_loudnorm_filter
 
 
 @dataclass(frozen=True)
@@ -98,6 +101,56 @@ def probe(file_path: Path) -> ProbeResult:
         audio_channels=audio_channels,
         duration=duration,
     )
+
+
+def _parse_loudnorm_stats(stderr: str) -> LoudnessStats | None:
+    start = stderr.rfind("{")
+    end = stderr.rfind("}")
+    if start == -1 or end < start:
+        return None
+
+    try:
+        data = json.loads(stderr[start : end + 1])
+        stats = LoudnessStats(
+            input_i=float(data["input_i"]),
+            input_tp=float(data["input_tp"]),
+            input_lra=float(data["input_lra"]),
+            input_thresh=float(data["input_thresh"]),
+            target_offset=float(data["target_offset"]),
+        )
+    except (json.JSONDecodeError, KeyError, ValueError):
+        return None
+
+    if not all(math.isfinite(getattr(stats, f.name)) for f in fields(stats)):
+        return None
+    return stats
+
+
+def measure_loudness(file_path: Path) -> LoudnessStats | None:
+    ffmpeg = get_ffmpeg_path()
+    result = subprocess.run(
+        [
+            ffmpeg,
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            str(file_path),
+            "-vn",
+            "-sn",
+            "-dn",
+            "-af",
+            build_loudnorm_filter(),
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        return None
+    return _parse_loudnorm_stats(result.stderr)
 
 
 def run_conversion(

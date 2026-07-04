@@ -19,8 +19,14 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from convert_to_mp4.audio import AudioInfo, calculate_optimal_bitrate, should_reencode
-from convert_to_mp4.ffmpeg import ProbeResult, probe, run_conversion
+from convert_to_mp4.audio import (
+    AudioInfo,
+    LoudnessStats,
+    build_loudnorm_filter,
+    calculate_optimal_bitrate,
+    should_reencode,
+)
+from convert_to_mp4.ffmpeg import ProbeResult, measure_loudness, probe, run_conversion
 
 VIDEO_EXTENSIONS = {
     ".mkv",
@@ -62,6 +68,7 @@ class ConversionOptions:
     min_quality: int = 128
     max_quality: int = 256
     force_audio: bool = False
+    normalize: bool = True
     dry_run: bool = False
     recursive: bool = False
     jobs: int = 1
@@ -103,16 +110,23 @@ def _is_already_compatible(probe_result: ProbeResult, file_path: Path) -> bool:
     )
 
 
-def _build_ffmpeg_params(probe_result: ProbeResult, options: ConversionOptions) -> list[str]:
-    params = ["-c:v", "copy"]
-
+def _needs_audio_reencode(probe_result: ProbeResult, options: ConversionOptions) -> bool:
     audio_info = AudioInfo(
         codec=probe_result.audio_codec,
         channels=probe_result.audio_channels,
         bitrate=probe_result.audio_bitrate,
     )
+    return should_reencode(audio_info, options.force_audio) or options.quality is not None
 
-    if should_reencode(audio_info, options.force_audio) or options.quality is not None:
+
+def _build_ffmpeg_params(
+    probe_result: ProbeResult,
+    options: ConversionOptions,
+    loudness: LoudnessStats | None = None,
+) -> list[str]:
+    params = ["-c:v", "copy"]
+
+    if _needs_audio_reencode(probe_result, options):
         if options.quality is not None:
             target_bitrate = options.quality
         else:
@@ -122,7 +136,12 @@ def _build_ffmpeg_params(probe_result: ProbeResult, options: ConversionOptions) 
                 options.min_quality,
                 options.max_quality,
             )
-        params.extend(["-c:a", "aac", "-ac", "2", "-b:a", f"{target_bitrate}k"])
+        params.extend(["-c:a", "aac"])
+        if loudness is not None:
+            params.extend(["-af", build_loudnorm_filter(loudness), "-ar", "48000"])
+        else:
+            params.extend(["-ac", "2"])
+        params.extend(["-b:a", f"{target_bitrate}k"])
     else:
         params.extend(["-c:a", "copy"])
 
@@ -194,7 +213,11 @@ def convert_file(
         result.error = "insufficient disk space"
         return result
 
-    params = _build_ffmpeg_params(probe_result, options)
+    loudness = None
+    if options.normalize and _needs_audio_reencode(probe_result, options):
+        loudness = measure_loudness(file_path)
+
+    params = _build_ffmpeg_params(probe_result, options, loudness)
     start = time.monotonic()
 
     success = _run_with_retries(
