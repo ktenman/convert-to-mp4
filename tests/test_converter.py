@@ -237,6 +237,27 @@ class TestLoudnessNormalization:
         mock_measure.assert_not_called()
         assert params[params.index("-c:a") + 1] == "copy"
 
+    def test_reports_measurement_phase(
+        self, tmp_path, mocker, incompatible_probe, default_options, loudness_stats
+    ):
+        video = tmp_path / "test.mkv"
+        video.write_bytes(b"\x00" * 1024)
+
+        mocker.patch("convert_to_mp4.converter.probe", return_value=incompatible_probe)
+        mocker.patch("convert_to_mp4.converter.check_disk_space", return_value=True)
+        mocker.patch("convert_to_mp4.converter.run_conversion", return_value=True)
+        mock_measure = mocker.patch(
+            "convert_to_mp4.converter.measure_loudness", return_value=loudness_stats
+        )
+        mocker.patch("pathlib.Path.stat", return_value=MagicMock(st_size=800))
+
+        on_phase = MagicMock()
+        convert_file(video, default_options, on_phase=on_phase)
+
+        mock_measure.assert_called_once_with(video, 60.0, None)
+        phases = [c.args[0] for c in on_phase.call_args_list]
+        assert phases == ["measuring loudness", "converting"]
+
 
 class TestConvertDirectory:
     @pytest.fixture(autouse=True)
