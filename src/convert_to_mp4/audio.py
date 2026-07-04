@@ -5,39 +5,12 @@ from dataclasses import dataclass
 STANDARD_BITRATES = (128, 160, 192, 224, 256, 320)
 DEFAULT_BITRATE = 192
 
-LOUDNESS_TARGET_I = -16.0
-LOUDNESS_TARGET_TP = -1.5
-LOUDNESS_TARGET_LRA = 11.0
-
 
 @dataclass(frozen=True)
 class AudioInfo:
     codec: str
     channels: int
     bitrate: int
-
-
-@dataclass(frozen=True)
-class LoudnessStats:
-    input_i: float
-    input_tp: float
-    input_lra: float
-    input_thresh: float
-    target_offset: float
-
-
-def build_loudnorm_filter(stats: LoudnessStats | None = None) -> str:
-    base = (
-        "aformat=channel_layouts=stereo,"
-        f"loudnorm=I={LOUDNESS_TARGET_I:g}:TP={LOUDNESS_TARGET_TP:g}:LRA={LOUDNESS_TARGET_LRA:g}"
-    )
-    if stats is None:
-        return f"{base}:print_format=json"
-    return (
-        f"{base}:measured_I={stats.input_i:g}:measured_TP={stats.input_tp:g}"
-        f":measured_LRA={stats.input_lra:g}:measured_thresh={stats.input_thresh:g}"
-        f":offset={stats.target_offset:g}:linear=true"
-    )
 
 
 def calculate_optimal_bitrate(

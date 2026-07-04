@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from convert_to_mp4.audio import LoudnessStats
 from convert_to_mp4.converter import (
     ConversionOptions,
     ConversionResult,
@@ -12,7 +11,7 @@ from convert_to_mp4.converter import (
     convert_file,
     find_video_files,
 )
-from convert_to_mp4.ffmpeg import ProbeResult
+from convert_to_mp4.ffmpeg import LoudnessStats, ProbeResult
 
 
 @pytest.fixture

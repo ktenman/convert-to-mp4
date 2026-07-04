@@ -5,8 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from convert_to_mp4.audio import LoudnessStats
 from convert_to_mp4.ffmpeg import (
+    LoudnessStats,
+    build_loudnorm_filter,
     get_ffmpeg_path,
     get_ffprobe_path,
     measure_loudness,
@@ -126,6 +127,37 @@ class TestProbe:
         )
         with pytest.raises(RuntimeError, match="ffprobe failed"):
             probe(Path("/fake/video.mkv"))
+
+
+class TestBuildLoudnormFilter:
+    def test_measurement_filter_downmixes_and_prints_json(self):
+        filter_str = build_loudnorm_filter()
+
+        assert filter_str.startswith("aformat=channel_layouts=stereo,loudnorm=")
+        assert "I=-16" in filter_str
+        assert "TP=-1.5" in filter_str
+        assert "LRA=11" in filter_str
+        assert filter_str.endswith(":print_format=json")
+
+    def test_apply_filter_includes_measured_values(self):
+        stats = LoudnessStats(
+            input_i=-27.2,
+            input_tp=-4.9,
+            input_lra=16.1,
+            input_thresh=-38.1,
+            target_offset=0.4,
+        )
+
+        filter_str = build_loudnorm_filter(stats)
+
+        assert filter_str.startswith("aformat=channel_layouts=stereo,loudnorm=")
+        assert "measured_I=-27.2" in filter_str
+        assert "measured_TP=-4.9" in filter_str
+        assert "measured_LRA=16.1" in filter_str
+        assert "measured_thresh=-38.1" in filter_str
+        assert "offset=0.4" in filter_str
+        assert "linear=true" in filter_str
+        assert "print_format" not in filter_str
 
 
 SAMPLE_LOUDNORM_STDERR = """\

@@ -6,10 +6,8 @@ import math
 import shutil
 import subprocess
 from collections.abc import Callable
-from dataclasses import dataclass, fields
+from dataclasses import astuple, dataclass
 from pathlib import Path
-
-from convert_to_mp4.audio import LoudnessStats, build_loudnorm_filter
 
 
 @dataclass(frozen=True)
@@ -103,6 +101,34 @@ def probe(file_path: Path) -> ProbeResult:
     )
 
 
+LOUDNESS_TARGET_I = -16.0
+LOUDNESS_TARGET_TP = -1.5
+LOUDNESS_TARGET_LRA = 11.0
+
+
+@dataclass(frozen=True)
+class LoudnessStats:
+    input_i: float
+    input_tp: float
+    input_lra: float
+    input_thresh: float
+    target_offset: float
+
+
+def build_loudnorm_filter(stats: LoudnessStats | None = None) -> str:
+    base = (
+        "aformat=channel_layouts=stereo,"
+        f"loudnorm=I={LOUDNESS_TARGET_I:g}:TP={LOUDNESS_TARGET_TP:g}:LRA={LOUDNESS_TARGET_LRA:g}"
+    )
+    if stats is None:
+        return f"{base}:print_format=json"
+    return (
+        f"{base}:measured_I={stats.input_i:g}:measured_TP={stats.input_tp:g}"
+        f":measured_LRA={stats.input_lra:g}:measured_thresh={stats.input_thresh:g}"
+        f":offset={stats.target_offset:g}:linear=true"
+    )
+
+
 def _parse_loudnorm_stats(stderr: str) -> LoudnessStats | None:
     start = stderr.rfind("{")
     end = stderr.rfind("}")
@@ -121,7 +147,7 @@ def _parse_loudnorm_stats(stderr: str) -> LoudnessStats | None:
     except (json.JSONDecodeError, KeyError, ValueError):
         return None
 
-    if not all(math.isfinite(getattr(stats, f.name)) for f in fields(stats)):
+    if not all(map(math.isfinite, astuple(stats))):
         return None
     return stats
 
