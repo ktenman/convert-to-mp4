@@ -203,6 +203,13 @@ def _main(
         bool,
         typer.Option("--force-audio", help="Force audio re-encoding"),
     ] = False,
+    normalize: Annotated[
+        bool,
+        typer.Option(
+            "--normalize/--no-normalize",
+            help="Normalize loudness to -16 LUFS when re-encoding audio",
+        ),
+    ] = True,
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Show what would be done"),
@@ -230,6 +237,7 @@ def _main(
         min_quality=min_quality,
         max_quality=max_quality,
         force_audio=force_audio,
+        normalize=normalize,
         dry_run=dry_run,
         recursive=recursive,
         jobs=jobs,

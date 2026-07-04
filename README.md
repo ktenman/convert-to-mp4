@@ -2,7 +2,7 @@
 
 Smart video converter with automatic audio quality detection.
 
-Converts video files to browser-compatible MP4 with intelligent audio bitrate selection, progress tracking, error recovery, and presets.
+Converts video files to browser-compatible MP4 with intelligent audio bitrate selection, loudness normalization, progress tracking, error recovery, and presets.
 
 ## Installation
 
@@ -41,4 +41,5 @@ convert-to-mp4 --dry-run .
 | `--min-quality` | Minimum audio bitrate (default: 128) |
 | `--max-quality` | Maximum audio bitrate (default: 256) |
 | `--force-audio` | Re-encode even if already AAC |
+| `--normalize / --no-normalize` | Loudness-normalize to -16 LUFS when re-encoding audio (default: on) |
 | `--dry-run` | Show what would happen |

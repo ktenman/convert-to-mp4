@@ -11,7 +11,7 @@ from convert_to_mp4.converter import (
     convert_file,
     find_video_files,
 )
-from convert_to_mp4.ffmpeg import ProbeResult
+from convert_to_mp4.ffmpeg import LoudnessStats, ProbeResult
 
 
 @pytest.fixture
@@ -42,6 +42,10 @@ def incompatible_probe():
 
 
 class TestConvertFile:
+    @pytest.fixture(autouse=True)
+    def _no_loudness_measurement(self, mocker):
+        mocker.patch("convert_to_mp4.converter.measure_loudness", return_value=None)
+
     def test_skips_already_compatible_mp4(
         self, tmp_path, mocker, compatible_probe, default_options
     ):
@@ -161,6 +165,77 @@ class TestConvertFile:
 
         assert result.success is False
         assert video.exists()
+
+
+class TestLoudnessNormalization:
+    @pytest.fixture
+    def loudness_stats(self):
+        return LoudnessStats(
+            input_i=-27.2,
+            input_tp=-4.9,
+            input_lra=16.1,
+            input_thresh=-38.1,
+            target_offset=0.4,
+        )
+
+    def _convert(self, tmp_path, mocker, probe_result, options):
+        video = tmp_path / "test.mkv"
+        video.write_bytes(b"\x00" * 1024)
+
+        mocker.patch("convert_to_mp4.converter.probe", return_value=probe_result)
+        mocker.patch("convert_to_mp4.converter.check_disk_space", return_value=True)
+        mock_run = mocker.patch("convert_to_mp4.converter.run_conversion", return_value=True)
+        mocker.patch("pathlib.Path.stat", return_value=MagicMock(st_size=800))
+
+        convert_file(video, options)
+
+        call_args = mock_run.call_args
+        return call_args.kwargs.get("params") or call_args[0][2]
+
+    def test_reencode_applies_loudnorm_filter(
+        self, tmp_path, mocker, incompatible_probe, default_options, loudness_stats
+    ):
+        mock_measure = mocker.patch(
+            "convert_to_mp4.converter.measure_loudness", return_value=loudness_stats
+        )
+
+        params = self._convert(tmp_path, mocker, incompatible_probe, default_options)
+
+        mock_measure.assert_called_once()
+        filter_str = params[params.index("-af") + 1]
+        assert "loudnorm" in filter_str
+        assert "measured_I=-27.2" in filter_str
+        assert "linear=true" in filter_str
+        assert "aresample=48000" in filter_str
+        assert "-ac" not in params
+
+    def test_failed_measurement_falls_back_to_plain_downmix(
+        self, tmp_path, mocker, incompatible_probe, default_options
+    ):
+        mocker.patch("convert_to_mp4.converter.measure_loudness", return_value=None)
+
+        params = self._convert(tmp_path, mocker, incompatible_probe, default_options)
+
+        assert "-af" not in params
+        assert params[params.index("-ac") + 1] == "2"
+
+    def test_no_normalize_skips_measurement(self, tmp_path, mocker, incompatible_probe):
+        mock_measure = mocker.patch("convert_to_mp4.converter.measure_loudness")
+
+        params = self._convert(
+            tmp_path, mocker, incompatible_probe, ConversionOptions(normalize=False)
+        )
+
+        mock_measure.assert_not_called()
+        assert "-af" not in params
+
+    def test_copied_audio_skips_measurement(self, tmp_path, mocker, compatible_probe):
+        mock_measure = mocker.patch("convert_to_mp4.converter.measure_loudness")
+
+        params = self._convert(tmp_path, mocker, compatible_probe, ConversionOptions())
+
+        mock_measure.assert_not_called()
+        assert params[params.index("-c:a") + 1] == "copy"
 
 
 class TestConvertDirectory:
