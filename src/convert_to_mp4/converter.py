@@ -196,6 +196,12 @@ def convert_file(
         input_size=input_size,
     )
 
+    if not is_same_path and final_output.exists():
+        result.skipped = True
+        result.skip_reason = "output exists"
+        result.success = True
+        return result
+
     probe_result = probe(file_path)
     result.duration = probe_result.duration
 
