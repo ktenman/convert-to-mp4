@@ -60,6 +60,23 @@ class TestConvertFile:
         assert result.skipped is True
         mock_run.assert_not_called()
 
+    def test_skips_when_target_mp4_exists(self, tmp_path, mocker, default_options):
+        video = tmp_path / "test.mkv"
+        video.write_bytes(b"\x00" * 1024)
+        existing = tmp_path / "test.mp4"
+        existing.write_bytes(b"done")
+
+        mock_probe = mocker.patch("convert_to_mp4.converter.probe")
+        mock_run = mocker.patch("convert_to_mp4.converter.run_conversion")
+
+        result = convert_file(video, default_options)
+
+        assert result.skipped is True
+        assert result.skip_reason == "output exists"
+        mock_probe.assert_not_called()
+        mock_run.assert_not_called()
+        assert existing.read_bytes() == b"done"
+
     def test_converts_incompatible_audio(
         self, tmp_path, mocker, incompatible_probe, default_options
     ):
@@ -70,6 +87,7 @@ class TestConvertFile:
         mock_run = mocker.patch("convert_to_mp4.converter.run_conversion", return_value=True)
         mocker.patch("convert_to_mp4.converter.check_disk_space", return_value=True)
         mocker.patch("pathlib.Path.stat", return_value=MagicMock(st_size=800))
+        mocker.patch("pathlib.Path.exists", return_value=False)
 
         result = convert_file(video, default_options)
 
@@ -123,7 +141,7 @@ class TestConvertFile:
         mocker.patch("convert_to_mp4.converter.probe", return_value=incompatible_probe)
         mocker.patch("convert_to_mp4.converter.check_disk_space", return_value=True)
         mock_run = mocker.patch("convert_to_mp4.converter.run_conversion", return_value=False)
-        mocker.patch("pathlib.Path.exists", return_value=True)
+        mocker.patch("pathlib.Path.exists", return_value=False)
         mocker.patch("pathlib.Path.unlink")
 
         result = convert_file(video, default_options)
@@ -186,6 +204,7 @@ class TestLoudnessNormalization:
         mocker.patch("convert_to_mp4.converter.check_disk_space", return_value=True)
         mock_run = mocker.patch("convert_to_mp4.converter.run_conversion", return_value=True)
         mocker.patch("pathlib.Path.stat", return_value=MagicMock(st_size=800))
+        mocker.patch("pathlib.Path.exists", return_value=False)
 
         convert_file(video, options)
 
@@ -250,6 +269,7 @@ class TestLoudnessNormalization:
             "convert_to_mp4.converter.measure_loudness", return_value=loudness_stats
         )
         mocker.patch("pathlib.Path.stat", return_value=MagicMock(st_size=800))
+        mocker.patch("pathlib.Path.exists", return_value=False)
 
         on_phase = MagicMock()
         convert_file(video, default_options, on_phase=on_phase)
